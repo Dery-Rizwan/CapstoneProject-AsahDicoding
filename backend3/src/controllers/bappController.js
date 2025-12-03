@@ -1,5 +1,6 @@
 const { BAPP, BAPPWorkItem, User, BAPPApproval } = require('../models');
 const { Op } = require('sequelize');
+const NotificationService = require('../services/notificationService'); // ADD THIS
 
 // Helper function to generate BAPP number
 const generateBAPPNumber = async () => {
@@ -336,13 +337,16 @@ exports.deleteBAPP = async (req, res) => {
   }
 };
 
-// Submit BAPP for review
+// Submit BAPP for review - UPDATED WITH NOTIFICATION
 exports.submitBAPP = async (req, res) => {
   try {
     const { id } = req.params;
 
     const bapp = await BAPP.findByPk(id, {
-      include: [{ model: BAPPWorkItem, as: 'workItems' }]
+      include: [
+        { model: BAPPWorkItem, as: 'workItems' },
+        { model: User, as: 'vendor' }
+      ]
     });
 
     if (!bapp) {
@@ -377,6 +381,9 @@ exports.submitBAPP = async (req, res) => {
 
     await bapp.update({ status: 'submitted' });
 
+    // Send notifications to Approvers
+    await NotificationService.notifyBAPPSubmitted(bapp, bapp.vendor);
+
     res.status(200).json({
       success: true,
       message: 'BAPP submitted successfully',
@@ -392,7 +399,7 @@ exports.submitBAPP = async (req, res) => {
   }
 };
 
-// Start review BAPP (by Direksi Pekerjaan / Approver)
+// Start review BAPP (by Direksi Pekerjaan / Approver) - UPDATED WITH NOTIFICATION
 exports.startReviewBAPP = async (req, res) => {
   try {
     const { id } = req.params;
@@ -433,6 +440,9 @@ exports.startReviewBAPP = async (req, res) => {
     
     if (!bapp.direksiPekerjaanId) {
       updateData.direksiPekerjaanId = reviewerId;
+      
+      // Send notification about assignment
+      await NotificationService.notifyBAPPAssigned(bapp, req.user, bapp.vendor);
     }
 
     await bapp.update(updateData);

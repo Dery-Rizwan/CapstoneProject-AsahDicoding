@@ -1,7 +1,8 @@
 const { BAPP, BAPPApproval, User, BAPPWorkItem } = require('../models');
 const { sequelize } = require('../models');
+const NotificationService = require('../services/notificationService'); // ADD THIS
 
-// Approve BAPP (by Direksi Pekerjaan or Approver)
+// Approve BAPP (by Direksi Pekerjaan or Approver) - UPDATED WITH NOTIFICATION
 exports.approveBAPP = async (req, res) => {
   const transaction = await sequelize.transaction();
   
@@ -78,6 +79,9 @@ exports.approveBAPP = async (req, res) => {
 
     await transaction.commit();
 
+    // Send notification to vendor
+    await NotificationService.notifyBAPPApproved(bapp, req.user, bapp.vendor);
+
     // Fetch updated BAPP
     const updatedBAPP = await BAPP.findByPk(id, {
       include: [
@@ -108,7 +112,7 @@ exports.approveBAPP = async (req, res) => {
   }
 };
 
-// Reject BAPP
+// Reject BAPP - UPDATED WITH NOTIFICATION
 exports.rejectBAPP = async (req, res) => {
   const transaction = await sequelize.transaction();
   
@@ -125,7 +129,9 @@ exports.rejectBAPP = async (req, res) => {
       });
     }
 
-    const bapp = await BAPP.findByPk(id);
+    const bapp = await BAPP.findByPk(id, {
+      include: [{ model: User, as: 'vendor' }]
+    });
 
     if (!bapp) {
       await transaction.rollback();
@@ -168,6 +174,9 @@ exports.rejectBAPP = async (req, res) => {
 
     await transaction.commit();
 
+    // Send notification to vendor
+    await NotificationService.notifyBAPPRejected(bapp, req.user, bapp.vendor, rejectionReason);
+
     // Fetch updated BAPP
     const updatedBAPP = await BAPP.findByPk(id, {
       include: [
@@ -198,7 +207,7 @@ exports.rejectBAPP = async (req, res) => {
   }
 };
 
-// Request revision for BAPP
+// Request revision for BAPP - UPDATED WITH NOTIFICATION
 exports.requestRevisionBAPP = async (req, res) => {
   const transaction = await sequelize.transaction();
   
@@ -215,7 +224,9 @@ exports.requestRevisionBAPP = async (req, res) => {
       });
     }
 
-    const bapp = await BAPP.findByPk(id);
+    const bapp = await BAPP.findByPk(id, {
+      include: [{ model: User, as: 'vendor' }]
+    });
 
     if (!bapp) {
       await transaction.rollback();
@@ -257,6 +268,9 @@ exports.requestRevisionBAPP = async (req, res) => {
     }, { transaction });
 
     await transaction.commit();
+
+    // Send notification to vendor
+    await NotificationService.notifyBAPPRevisionRequired(bapp, req.user, bapp.vendor, revisionReason);
 
     // Fetch updated BAPP
     const updatedBAPP = await BAPP.findByPk(id, {
