@@ -8,6 +8,7 @@ const userRoutes = require('./routes/userRoutes');
 const bapbRoutes = require('./routes/bapbRoutes');
 const bappRoutes = require('./routes/bappRoutes');
 const documentRoutes = require('./routes/documentRoutes');
+const notificationRoutes = require('./routes/notificationRoutes'); // NEW
 
 const app = express();
 
@@ -33,7 +34,8 @@ app.get('/', (req, res) => {
       users: '/api/users',
       bapb: '/api/bapb',
       bapp: '/api/bapp',
-      documents: '/api/documents'
+      documents: '/api/documents',
+      notifications: '/api/notifications' // NEW
     }
   });
 });
@@ -43,7 +45,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/bapb', bapbRoutes);
 app.use('/api/bapp', bappRoutes);
-app.use('/api/documents', documentRoutes); // NEW: Document generation routes
+app.use('/api/documents', documentRoutes);
+app.use('/api/notifications', notificationRoutes); // NEW
 
 // Error handler middleware
 app.use((err, req, res, next) => {
@@ -79,6 +82,7 @@ sequelize.sync({ alter: true })
       console.log('   - BAPB: /api/bapb');
       console.log('   - BAPP: /api/bapp');
       console.log('   - Documents: /api/documents');
+      console.log('   - Notifications: /api/notifications'); // NEW
     });
   })
   .catch(err => {

@@ -19,6 +19,7 @@ const sequelize = new Sequelize(
 // Initialize all models
 const models = {
   User: require('./User')(sequelize),
+  Notification: require('./Notification')(sequelize), // NEW
   
   // BAPB Models
   BAPB: require('./BAPB')(sequelize),
@@ -32,6 +33,17 @@ const models = {
   BAPPApproval: require('./BAPPApproval')(sequelize),
   BAPPAttachment: require('./BAPPAttachment')(sequelize)
 };
+
+// ==================== Notification Associations ====================
+models.Notification.belongsTo(models.User, {
+  foreignKey: 'userId',
+  as: 'user'
+});
+
+models.User.hasMany(models.Notification, {
+  foreignKey: 'userId',
+  as: 'notifications'
+});
 
 // ==================== BAPB Associations ====================
 models.BAPB.belongsTo(models.User, { 

@@ -1,5 +1,6 @@
 const { BAPB, BAPBApproval, User, BAPBItem } = require('../models');
 const { sequelize } = require('../models');
+const NotificationService = require('../services/notificationService'); // NEW
 
 // Approve BAPB (by PIC Gudang or Approver)
 exports.approveBAPB = async (req, res) => {
@@ -25,7 +26,6 @@ exports.approveBAPB = async (req, res) => {
       });
     }
 
-    // Check if BAPB is in correct status
     if (bapb.status !== 'submitted' && bapb.status !== 'in_review') {
       await transaction.rollback();
       return res.status(400).json({
@@ -34,7 +34,6 @@ exports.approveBAPB = async (req, res) => {
       });
     }
 
-    // Check authorization - only pic_gudang and approver can approve
     if (!['pic_gudang', 'approver', 'admin'].includes(req.user.role)) {
       await transaction.rollback();
       return res.status(403).json({
@@ -43,7 +42,6 @@ exports.approveBAPB = async (req, res) => {
       });
     }
 
-    // Check if user already approved
     const existingApproval = await BAPBApproval.findOne({
       where: {
         bapbId: id,
@@ -60,7 +58,6 @@ exports.approveBAPB = async (req, res) => {
       });
     }
 
-    // Create approval record
     await BAPBApproval.create({
       bapbId: id,
       approverId,
@@ -68,7 +65,6 @@ exports.approveBAPB = async (req, res) => {
       notes
     }, { transaction });
 
-    // Update BAPB status and assign PIC if not assigned
     const updateData = { status: 'approved' };
     if (!bapb.picGudangId && req.user.role === 'pic_gudang') {
       updateData.picGudangId = approverId;
@@ -78,7 +74,9 @@ exports.approveBAPB = async (req, res) => {
 
     await transaction.commit();
 
-    // Fetch updated BAPB
+    // Send notification to vendor
+    await NotificationService.notifyBAPBApproved(bapb, req.user, bapb.vendor);
+
     const updatedBAPB = await BAPB.findByPk(id, {
       include: [
         { model: User, as: 'vendor', attributes: ['id', 'name', 'email', 'company'] },
@@ -125,7 +123,9 @@ exports.rejectBAPB = async (req, res) => {
       });
     }
 
-    const bapb = await BAPB.findByPk(id);
+    const bapb = await BAPB.findByPk(id, {
+      include: [{ model: User, as: 'vendor' }]
+    });
 
     if (!bapb) {
       await transaction.rollback();
@@ -143,7 +143,6 @@ exports.rejectBAPB = async (req, res) => {
       });
     }
 
-    // Check authorization
     if (!['pic_gudang', 'approver', 'admin'].includes(req.user.role)) {
       await transaction.rollback();
       return res.status(403).json({
@@ -152,7 +151,6 @@ exports.rejectBAPB = async (req, res) => {
       });
     }
 
-    // Create rejection record
     await BAPBApproval.create({
       bapbId: id,
       approverId,
@@ -160,7 +158,6 @@ exports.rejectBAPB = async (req, res) => {
       notes
     }, { transaction });
 
-    // Update BAPB status
     await bapb.update({
       status: 'rejected',
       rejectionReason
@@ -168,7 +165,9 @@ exports.rejectBAPB = async (req, res) => {
 
     await transaction.commit();
 
-    // Fetch updated BAPB
+    // Send notification to vendor
+    await NotificationService.notifyBAPBRejected(bapb, req.user, bapb.vendor, rejectionReason);
+
     const updatedBAPB = await BAPB.findByPk(id, {
       include: [
         { model: User, as: 'vendor', attributes: ['id', 'name', 'email', 'company'] },
@@ -215,7 +214,9 @@ exports.requestRevisionBAPB = async (req, res) => {
       });
     }
 
-    const bapb = await BAPB.findByPk(id);
+    const bapb = await BAPB.findByPk(id, {
+      include: [{ model: User, as: 'vendor' }]
+    });
 
     if (!bapb) {
       await transaction.rollback();
@@ -233,7 +234,6 @@ exports.requestRevisionBAPB = async (req, res) => {
       });
     }
 
-    // Check authorization
     if (!['pic_gudang', 'approver', 'admin'].includes(req.user.role)) {
       await transaction.rollback();
       return res.status(403).json({
@@ -242,7 +242,6 @@ exports.requestRevisionBAPB = async (req, res) => {
       });
     }
 
-    // Create revision request record
     await BAPBApproval.create({
       bapbId: id,
       approverId,
@@ -250,7 +249,6 @@ exports.requestRevisionBAPB = async (req, res) => {
       notes
     }, { transaction });
 
-    // Update BAPB status
     await bapb.update({
       status: 'revision_required',
       rejectionReason: revisionReason
@@ -258,7 +256,9 @@ exports.requestRevisionBAPB = async (req, res) => {
 
     await transaction.commit();
 
-    // Fetch updated BAPB
+    // Send notification to vendor
+    await NotificationService.notifyBAPBRevisionRequired(bapb, req.user, bapb.vendor, revisionReason);
+
     const updatedBAPB = await BAPB.findByPk(id, {
       include: [
         { model: User, as: 'vendor', attributes: ['id', 'name', 'email', 'company'] },
